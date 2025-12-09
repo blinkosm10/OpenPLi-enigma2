@@ -3,6 +3,7 @@
 #include <lib/base/encoding.h>
 #include <lib/dvb/dvbtime.h>
 #include <lib/dvb/idvb.h>
+#include <lib/dvb/db.h> 
 #include <dvbsi++/event_information_section.h>
 #include <dvbsi++/short_event_descriptor.h>
 #include <dvbsi++/extended_event_descriptor.h>
@@ -353,6 +354,7 @@ RESULT eServiceEvent::parseFrom(const std::string& filename, int tsidonid)
 {
 	return parseFrom(filename, tsidonid, 0);
 }
+RESULT eServiceEvent::parseFrom(const std::string& filename, int tsidonid, int sid) 
 {
 	if (!filename.empty())
 	{
