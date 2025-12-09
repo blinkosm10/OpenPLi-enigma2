@@ -1097,7 +1097,7 @@ void eEPGCache::load()
 		}
 	}
 	(void)ret;
-	f(m_debug) {
+	if(m_debug) {
 		eDebug("[eEPGCache] load() - finished");
 	}
 }
@@ -1376,7 +1376,7 @@ RESULT eEPGCache::lookupEventId(const eServiceReference &service, int event_id, 
 		Event ev((uint8_t*)data->get());
 		result = new eServiceEvent();
 		const eServiceReferenceDVB &ref = (const eServiceReferenceDVB&)service;
-		ret = result->parseFrom(&ev, (ref.getTransportStreamID().get()<<16)|ref.getOriginalNetworkID().get(), ref.getServiceID().get())
+		ret = result->parseFrom(&ev, (ref.getTransportStreamID().get()<<16)|ref.getOriginalNetworkID().get(), ref.getServiceID().get());
 	}
 	return ret;
 }
@@ -2492,7 +2492,7 @@ PyObject *eEPGCache::search(ePyObject arg)
 							{
 								auto cid = ContentIdentifierDescriptor(data);
 								auto cril = cid.getIdentifier();
-								ffor (auto crid = cril->begin(); crid != cril->end(); ++crid)
+								for (auto crid = cril->begin(); crid != cril->end(); ++crid)
 								{
 									// UK broadcasters set the two top bits of crid_type, i.e. 0x31 and 0x32 rather than
 									// the specification's 1 and 2 for episode and series respectively
