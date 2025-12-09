@@ -425,9 +425,9 @@ PyObject *eServiceEvent::getCridData(int mask) const
 		if ((1 << cridMatchType) & mask)
 		{
 			ePyObject tuple = PyTuple_New(3);
-			PyTuple_SET_ITEM(tuple, 0, PyInt_FromLong(it->getType()));
-			PyTuple_SET_ITEM(tuple, 1, PyInt_FromLong(it->getLocation()));
-			PyTuple_SET_ITEM(tuple, 2, PyString_FromString(it->getCrid().c_str()));
+			PyTuple_SET_ITEM(tuple, 0, PyLong_FromLong(it->getType()));
+			PyTuple_SET_ITEM(tuple, 1, PyLong_FromLong(it->getLocation()));
+			PyTuple_SET_ITEM(tuple, 2, PyUnicode_FromString(it->getCrid().c_str()));
 			PyList_Append(ret, tuple);
 		}
 	}
