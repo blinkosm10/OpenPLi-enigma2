@@ -322,6 +322,7 @@ void eventData::load(FILE *f)
 	uint8_t header[2];
 	size_t ret; /* dummy value to store fread return values */
 	ret = fread(&size, sizeof(int), 1, f);
+	descriptors.clear(); 
 	descriptors.rehash(size);
 	while(size)
 	{
@@ -681,7 +682,7 @@ void eEPGCache::sectionRead(const uint8_t *data, int source, eEPGChannelData *ch
 			evt = new eventData(eit_event, eit_event_size, source, (tsid<<16)|onid);
 #ifdef EPG_DEBUG
 	if(m_debug) {
-					consistencyCheck=false;
+					bool consistencyCheck=true;
 				}
 #endif
 			if (ev_erase_count > 0 && tm_erase_count > 0) // 2 different pairs have been removed
@@ -749,6 +750,8 @@ next:
 		if(m_debug) {
 			if ( servicemap.byEvent.size() != servicemap.byTime.size() )
 			{
+				{ 
+					  
 				CFile f("/media/hdd/event_map.txt", "w+");
 					int i = 0;
 					for (eventMap::iterator it(servicemap.byEvent.begin()); it != servicemap.byEvent.end(); ++it )
@@ -757,6 +760,7 @@ next:
 						i++, (int)it->first, (int)it->second->getStartTime(), (int)it->second->getEventID(), it->second );
 					}
 			}
+				{ 
 			CFile f("/media/hdd/time_map.txt", "w+");
 					int i = 0;
 					for (timeMap::iterator it(servicemap.byTime.begin()); it != servicemap.byTime.end(); ++it )
@@ -769,10 +773,17 @@ next:
 					service.sid, service.tsid, service.onid,
 					servicemap.byEvent.size(), servicemap.byTime.size() );
 		}
+			 } 
 #endif
 		ptr += eit_event_size;
 		eit_event = (eit_event_struct*)(((uint8_t*)eit_event) + eit_event_size);
 	}
+
+	}
+
+void eEPGCache::flushEPG(int sid, int onid, int tsid)
+{
+        flushEPG(uniqueEPGKey(sid, onid, tsid)); 
 }
 
 // epg cache needs to be locked(cache_lock) before calling the procedure
@@ -945,6 +956,13 @@ void eEPGCache::thread()
 
 static const char* EPGDAT_IN_FLASH = "/epg.dat";
 
+void eEPGCache::clear()
+{
+        flushEPG();
+}
+
+const static unsigned int EPG_MAGIC = 0x98765432; 
+
 void eEPGCache::load()
 {
 	if(m_debug) {
@@ -980,7 +998,7 @@ void eEPGCache::load()
 		unsigned int magic=0;
 		unlink(EPGDAT_IN_FLASH);/* Don't keep it around when in flash */
 		ret = fread( &magic, sizeof(int), 1, f);
-		if (magic != 0x98765432)
+		if (magic != EPG_MAGIC)
 		{
 			eDebug("[eEPGCache] epg file has incorrect byte order.. dont read it");
 			fclose(f);
