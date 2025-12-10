@@ -2,7 +2,7 @@
 #define __epgtransponderdatareader_h_
 
 /* Restart EPG data capture */
-#define UPDATE_INTERVAL 3600000  // 60 min
+#define UPDATE_INTERVAL 900 // 60 min
 /* Time to wait after tuning in before EPG data capturing starts */
 #define ZAP_DELAY 2000          // 2 sec
 
