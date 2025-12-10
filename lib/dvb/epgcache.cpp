@@ -2130,6 +2130,11 @@ unsigned int eEPGCache::getEpgSources()
 	return m_enabledEpgSources;
 }
 
+unsigned int eEPGCache::getEpgmaxdays()
+{
+	return maxdays;
+}
+
 static const char* getStringFromPython(ePyObject obj)
 {
 	const char *result = 0;
