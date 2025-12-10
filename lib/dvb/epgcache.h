@@ -180,9 +180,11 @@ public:
 	static eEPGCache *getInstance() { return instance; }
 
     void crossepgImportEPGv21(std::string dbroot);
+    void clear(); 
 	void save();
 	void load();
 	void timeUpdated();
+    void flushEPG(int sid, int onid, int tsid); 
 	void flushEPG(const uniqueEPGKey & s=uniqueEPGKey(), bool lock = true);
 #ifndef SWIG
 	eEPGCache();
