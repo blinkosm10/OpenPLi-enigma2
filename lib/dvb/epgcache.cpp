@@ -12,6 +12,7 @@
 #include <sys/vfs.h> // for statfs
 #include <lib/base/encoding.h>
 #include <lib/base/estring.h>
+#include <lib/base/esimpleconfig.h> 
 #include <lib/dvb/db.h>
 #include <lib/dvb/dvb.h>
 #include <lib/dvb/epgchanneldata.h>
@@ -155,10 +156,7 @@ eventData::eventData(const eit_event_struct* e, int size, int _type, int tsidoni
 					std::transform(cc.begin(), cc.end(), cc.begin(), tolower);
 					int table = encodingHandler.getCountryCodeDefaultMapping(cc);
 
-					//if country code default table is cyrillic, use original encoding
-					//because convertion to utf8 would be limited to only 124 chars
-					bool isCyrillic = (table == 5) ? true : false;
-
+				
 					int eventNameLen = descr[5];
 					int textLen = descr[6 + eventNameLen];
 
@@ -166,16 +164,8 @@ eventData::eventData(const eit_event_struct* e, int size, int _type, int tsidoni
 					std::string eventNameUTF8 = convertDVBUTF8((const unsigned char*)&descr[6], eventNameLen, table, tsidonid);
 					std::string eventText((const char*)&descr[7 + eventNameLen], textLen);
 
-					if (!isCyrillic)
-					{
-						eventText = convertDVBUTF8((const unsigned char*)&descr[7 + eventNameLen], textLen, table, tsidonid);
-						//hack to fix split titles
-						undoAbbreviation(eventNameUTF8, eventText);
-					}
-
  					unsigned int eventNameUTF8len = eventNameUTF8.length();
- 					unsigned int eventTextlen = eventText.length();
-
+ 					
 					//Rebuild the short event descriptor with UTF-8 strings
 
 					//Save the title first
@@ -219,9 +209,6 @@ eventData::eventData(const eit_event_struct* e, int size, int _type, int tsidoni
 					//save text with UTF-8/original encoding
 					if( eventTextlen > 0 ) //only store the data if there is something to store
 					{
-						if (!isCyrillic)
-							eventTextlen = truncateUTF8(eventText, 255 - 6);
-
 						int text_len = 6 + eventTextlen;
 						uint8_t *text_data = new uint8_t[text_len + 2];
 						text_data[0] = SHORT_EVENT_DESCRIPTOR;
@@ -231,18 +218,8 @@ eventData::eventData(const eit_event_struct* e, int size, int _type, int tsidoni
 						text_data[4] = descr[4];
 						text_data[5] = 0;
 
-						if (isCyrillic)
-						{
-							//use original encoding
 							text_data[6] = eventTextlen;
 							memcpy(&text_data[7], eventText.data(), eventTextlen);
-						}
-						else
-						{
-							text_data[6] = eventTextlen + 1;
-							text_data[7] = 0x15; //identify event text as UTF-8
-							memcpy(&text_data[8], eventText.data(), eventTextlen);
-						}
 
 						text_len += 2; //add 2 the length to include the 2 bytes in the header
 						uint32_t text_crc = calculate_crc_hash(text_data, text_len);
@@ -364,7 +341,6 @@ void eventData::load(FILE *f)
 		descriptors[id] = p;
 		--size;
 	}
-	(void)ret;
 }
 
 void eventData::save(FILE *f)
@@ -415,6 +391,7 @@ eEPGCache::eEPGCache()
 	load_epg = eConfigManager::getConfigValue("config.usage.remote_fallback_import").find("epg") == std::string::npos;
 
 	historySeconds = 0;
+	maxdays = 7;
 
 	CONNECT(messages.recv_msg, eEPGCache::gotMessage);
 	CONNECT(eDVBLocalTimeHandler::getInstance()->m_timeUpdated, eEPGCache::timeUpdated);
@@ -459,85 +436,6 @@ void eEPGCache::timeUpdated()
 	}
 	else
 		eDebug("[eEPGCache] time updated.. but cache file not set yet.. dont start epg!!");
-}
-
-bool eEPGCache::FixOverlapping(EventCacheItem &servicemap, time_t TM, int duration, const timeMap::iterator &tm_it, const uniqueEPGKey &service)
-{
-	bool ret = false;
-	timeMap::iterator tmp = tm_it;
-
-	while ((tmp->first + tmp->second->getDuration() - 60) > TM)
-	{
-		if(tmp->first != TM
-#ifdef ENABLE_PRIVATE_EPG
-			&& tmp->second->type != PRIVATE
-#endif
-#ifdef ENABLE_MHW_EPG
-			&& tmp->second->type != MHW
-#endif
-			)
-		{
-			uint16_t event_id = tmp->second->getEventID();
-			servicemap.byEvent.erase(event_id);
-#ifdef EPG_DEBUG
-			if(m_debug) {
-				Event evt((uint8_t*)tmp->second->get());
-				eServiceEvent event;
-				event.parseFrom(&evt, service.sid<<16|service.onid);
-				eDebug("[eEPGCache] (1)erase no more used event %04x %d\n%s %s\n%s",
-					service.sid, event_id,
-					event.getBeginTimeString().c_str(),
-					event.getEventName().c_str(),
-					event.getExtendedDescription().c_str());
-			}
-#endif
-			delete tmp->second;
-			if (tmp == servicemap.byTime.begin())
-			{
-				servicemap.byTime.erase(tmp);
-				break;
-			}
-			else
-				servicemap.byTime.erase(tmp--);
-			ret = true;
-		}
-		else
-		{
-			if (tmp == servicemap.byTime.begin())
-				break;
-			--tmp;
-		}
-	}
-
-	tmp = tm_it;
-	while(tmp->first < (TM + duration - 60))
-	{
-		if (tmp->first != TM && tmp->second->type != PRIVATE)
-		{
-			uint16_t event_id = tmp->second->getEventID();
-			servicemap.byEvent.erase(event_id);
-#ifdef EPG_DEBUG
-			if(m_debug) {
-				Event evt((uint8_t*)tmp->second->get());
-				eServiceEvent event;
-				event.parseFrom(&evt, service.sid<<16|service.onid);
-				eDebug("[eEPGCache] (2)erase no more used event %04x %d\n%s %s\n%s",
-					service.sid, event_id,
-					event.getBeginTimeString().c_str(),
-					event.getEventName().c_str(),
-					event.getExtendedDescription().c_str());
-			}
-#endif
-			delete tmp->second;
-			servicemap.byTime.erase(tmp++);
-			ret = true;
-		}
-		else
-			++tmp;
-		if (tmp == servicemap.byTime.end())
-			break;
-	}
-	return ret;
 }
 
 void eEPGCache::sectionRead(const uint8_t *data, int source, eEPGChannelData *channel)
@@ -613,17 +511,14 @@ void eEPGCache::sectionRead(const uint8_t *data, int source, eEPGChannelData *ch
 		if (m_it != onid_blacklist.end())
 			goto next;
 
-		if ( (TM != 3599) &&		// NVOD Service
-		     (now <= (TM+duration)) &&	// skip old events
-		     (TM < (now+28*24*60*60)) &&	// no more than 4 weeks in future
-		     ( (onid != 1714) || (duration != (24*3600-1)) )	// PlatformaHD invalid event
-		   )
+		if ((start_time != 3599) &&  // NVOD Service
+				(start_time < (now+maxdays*24*60*60)) &&  // maxdays for EPG - no more than maxdays in future
+				((onid != 1714) || (duration != (24*3600-1))))  // PlatformaHD invalid event
+		   
 		{
 			uint16_t event_id = eit_event->getEventId();
-			eventData *evt = 0;
-			int ev_erase_count = 0;
-			int tm_erase_count = 0;
-
+			
+			
 			if (event_id == 0) {
 				// hack for some polsat services on 13.0E..... but this also replaces other valid event_ids with value 0..
 				// but we dont care about it...
