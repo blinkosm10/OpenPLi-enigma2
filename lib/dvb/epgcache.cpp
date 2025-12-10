@@ -594,9 +594,9 @@ void eEPGCache::sectionRead(const uint8_t *data, int source, eEPGChannelData *ch
 		if (m_it != onid_blacklist.end())
 			goto next;
 		
-             if ( (TM != 3599) &&		// NVOD Service
-		    (TM < (now+4*maxdays*24*60*60)) && // skip old events
-		     (TM < (now+28*24*60*60)) &&	// no more than 4 weeks in future
+            if ( (TM != 3599) &&		// NVOD Service
+		     (now <= (TM+duration)) &&	// skip old events
+		     (TM < (now+4*maxdays*24*60*60)) &&	// maxdays for EPG - no more than 4 weeks in future
 		     ( (onid != 1714) || (duration != (24*3600-1)) )	// PlatformaHD invalid event
 		   )
 		{
@@ -1161,7 +1161,7 @@ void eEPGCache::save()
 	singleLock lockcache(cache_lock);
 
 	int cnt=0;
-	unsigned int magic = 0x98765432;
+	unsigned int magic = EPG_MAGIC;
 	fwrite( &magic, sizeof(int), 1, f);
 	const char *text = "UNFINISHED_V8";
 	fwrite( text, 13, 1, f );
