@@ -393,6 +393,7 @@ eEPGCache::eEPGCache()
 	load_epg = eConfigManager::getConfigValue("config.usage.remote_fallback_import").find("epg") == std::string::npos;
 
 	historySeconds = 0;
+	maxdays = 7;
 
 	CONNECT(messages.recv_msg, eEPGCache::gotMessage);
 	CONNECT(eDVBLocalTimeHandler::getInstance()->m_timeUpdated, eEPGCache::timeUpdated);
@@ -594,7 +595,7 @@ void eEPGCache::sectionRead(const uint8_t *data, int source, eEPGChannelData *ch
 			goto next;
 		
              if ( (TM != 3599) &&		// NVOD Service
-		     (now <= (TM+duration)) &&	// skip old events
+		    (TM < (now+4*maxdays*24*60*60)) && // skip old events
 		     (TM < (now+28*24*60*60)) &&	// no more than 4 weeks in future
 		     ( (onid != 1714) || (duration != (24*3600-1)) )	// PlatformaHD invalid event
 		   )
@@ -1014,6 +1015,7 @@ void eEPGCache::load()
 				clearCompleteEPGCache();
 			}
 			ret = fread( &size, sizeof(int), 1, f);
+			eventDB.clear();
 			eventDB.rehash(size); /* Reserve buckets in advance */
 			while(size--)
 			{
