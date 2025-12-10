@@ -165,6 +165,7 @@ eventData::eventData(const eit_event_struct* e, int size, int _type, int tsidoni
 					std::string eventText((const char*)&descr[7 + eventNameLen], textLen);
 
  					unsigned int eventNameUTF8len = eventNameUTF8.length();
+					 unsigned int eventTextlen = eventText.length();
  					
 					//Rebuild the short event descriptor with UTF-8 strings
 
@@ -510,13 +511,17 @@ void eEPGCache::sectionRead(const uint8_t *data, int source, eEPGChannelData *ch
 		std::vector<int>::iterator m_it=find(onid_blacklist.begin(),onid_blacklist.end(),onid);
 		if (m_it != onid_blacklist.end())
 			goto next;
-
-		if ((start_time != 3599) &&  // NVOD Service
-				(start_time < (now+maxdays*24*60*60)) &&  // maxdays for EPG - no more than maxdays in future
-				((onid != 1714) || (duration != (24*3600-1))))  // PlatformaHD invalid event
-		   
+		
+             if ( (TM != 3599) &&		// NVOD Service
+		     (now <= (TM+duration)) &&	// skip old events
+		     (TM < (now+28*24*60*60)) &&	// no more than 4 weeks in future
+		     ( (onid != 1714) || (duration != (24*3600-1)) )	// PlatformaHD invalid event
+		   )
 		{
 			uint16_t event_id = eit_event->getEventId();
+			eventData *evt = 0;
+            int ev_erase_count = 0;
+            int tm_erase_count = 0; 
 			
 			
 			if (event_id == 0) {
