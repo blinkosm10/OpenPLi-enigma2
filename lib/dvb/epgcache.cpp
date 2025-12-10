@@ -438,6 +438,87 @@ void eEPGCache::timeUpdated()
 		eDebug("[eEPGCache] time updated.. but cache file not set yet.. dont start epg!!");
 }
 
+bool eEPGCache::FixOverlapping(EventCacheItem &servicemap, time_t TM, int duration, const timeMap::iterator &tm_it, const uniqueEPGKey &service)
+{
+	bool ret = false;
+	timeMap::iterator tmp = tm_it;
+
+	while ((tmp->first + tmp->second->getDuration() - 60) > TM)
+	{
+		if(tmp->first != TM
+#ifdef ENABLE_PRIVATE_EPG
+			&& tmp->second->type != PRIVATE
+#endif
+#ifdef ENABLE_MHW_EPG
+			&& tmp->second->type != MHW
+#endif
+			)
+		{
+			uint16_t event_id = tmp->second->getEventID();
+			servicemap.byEvent.erase(event_id);
+#ifdef EPG_DEBUG
+			if(m_debug) {
+				Event evt((uint8_t*)tmp->second->get());
+				eServiceEvent event;
+				event.parseFrom(&evt, service.sid<<16|service.onid);
+				eDebug("[eEPGCache] (1)erase no more used event %04x %d\n%s %s\n%s",
+					service.sid, event_id,
+					event.getBeginTimeString().c_str(),
+					event.getEventName().c_str(),
+					event.getExtendedDescription().c_str());
+			}
+#endif
+			delete tmp->second;
+			if (tmp == servicemap.byTime.begin())
+			{
+				servicemap.byTime.erase(tmp);
+				break;
+			}
+			else
+				servicemap.byTime.erase(tmp--);
+			ret = true;
+		}
+		else
+		{
+			if (tmp == servicemap.byTime.begin())
+				break;
+			--tmp;
+		}
+	}
+
+	tmp = tm_it;
+	while(tmp->first < (TM + duration - 60))
+	{
+		if (tmp->first != TM && tmp->second->type != PRIVATE)
+		{
+			uint16_t event_id = tmp->second->getEventID();
+			servicemap.byEvent.erase(event_id);
+#ifdef EPG_DEBUG
+			if(m_debug) {
+				Event evt((uint8_t*)tmp->second->get());
+				eServiceEvent event;
+				event.parseFrom(&evt, service.sid<<16|service.onid);
+				eDebug("[eEPGCache] (2)erase no more used event %04x %d\n%s %s\n%s",
+					service.sid, event_id,
+					event.getBeginTimeString().c_str(),
+					event.getEventName().c_str(),
+					event.getExtendedDescription().c_str());
+			}
+#endif
+			delete tmp->second;
+			servicemap.byTime.erase(tmp++);
+			ret = true;
+		}
+		else
+			++tmp;
+		if (tmp == servicemap.byTime.end())
+			break;
+	}
+	return ret;
+}
+
+
+
 void eEPGCache::sectionRead(const uint8_t *data, int source, eEPGChannelData *channel)
 {
 	const eit_t *eit = (const eit_t*) data;
