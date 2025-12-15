@@ -24,7 +24,7 @@
 #include <unordered_set>
 
 /* Interval between "garbage collect" cycles */
-#define CLEAN_INTERVAL 800    //  1 min
+#define CLEAN_INTERVAL 600    //  1 min
 
 struct DescriptorPair
 {
